@@ -1,0 +1,68 @@
+import 'package:flutter_application_4/models/note.dart';
+import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
+class NoteDatabase{
+  static final NoteDatabase instance = NoteDatabase._init();
+
+  NoteDatabase._init();
+
+  static Database? _database;
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDB('notes.db');
+    return _database!;
+  }
+
+  Future<Database> _initDB(String filePath) async{
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, filePath);
+    return await openDatabase(path, version: 1, onCreate: _createDB);
+  }
+Future<void> _createDB(Database db, int version ) async{
+  const sql = '''
+    CREATE TABLE $tableNotes(
+      ${NoteField.id} INTEGER PRIMARY KEY AUTOINCREMENT,
+      ${NoteField.isImportant} BOOLEAN NOT NULL,
+      ${NoteField.number} INTEGER NOT NULL,
+      ${NoteField.title} TEXT NOT NULL,
+      ${NoteField.description} TEXT NOT NULL,
+      ${NoteField.time} TEXT NOT NULL
+    )
+  ''';
+  await db.execute(sql);
+}
+
+  Future<Note> create(Note note) async{
+    final db = await instance.database;
+    final id = await db.insert(tableNotes, note.toJson());
+    return note.copy(id:id);
+  }
+  Future<List<Note>> getAllNotes() async {
+    final db = await instance.database;
+    final result = await db.query(tableNotes);
+    return result.map((json) => Note.fromJson(json)).toList();
+  }
+
+  Future<Note> getNoteById(int id) async{
+    final db = await instance.database;
+    final result = await db.query(tableNotes, where: '${NoteField.id} =?', whereArgs: [id]);
+    if(result.isNotEmpty){
+      return Note.fromJson(result.first);
+    }else{
+      throw Exception('ID $id not found');
+    }
+  }
+
+  Future<int> deleteNoteById(int id) async{
+    final db = await instance.database;
+    return await db.
+    delete(tableNotes, where: '${NoteField.id} = ?', whereArgs: [id]);
+  }
+
+  Future<int> UpdateNote(Note note) async{
+    final db = await instance.database;
+    return await db.update(tableNotes, note.toJson(), where: '${NoteField.id} = ?', whereArgs: [note.id]);
+  }
+}
